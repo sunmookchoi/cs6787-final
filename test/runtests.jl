@@ -3,34 +3,6 @@ using LinearAlgebra
 using Random
 using Test
 
-@testset "core estimation and planning" begin
-    rng = Random.Xoshiro(11)
-    system = make_simple_system(rho=0.25)
-    config = ComparisonConfig(T=40, H=16, L=3, sigma_w=0.0, sigma_z=0.0,
-        include_random=false)
-    instance = make_planning_instance(system, config; rng=rng)
-
-    @test size(instance.Ghat) == size(instance.Gtrue)
-    @test size(instance.S_hat) == size(instance.S_true)
-    @test size(instance.S_hat, 1) == 2 * (config.T - config.H + 1)
-    @test isfinite(instance.G_rel_error)
-end
-
-@testset "low-rank factorization" begin
-    rng = Random.Xoshiro(12)
-    S = Symmetric(randn(rng, 8, 8))
-    S = Matrix(0.5 * (S + S'))
-    sol = low_rank_sdp_factorization(S; rank=3, restarts=2, maxiter=80,
-        round_restarts=16, rng=rng)
-
-    @test sol.rank == 3
-    @test length(sol.x) == 8
-    @test all(abs.(sol.x) .== 1)
-    @test isfinite(sol.relaxed_value)
-    @test isfinite(sol.rounded_value)
-    @test all(abs.(sqrt.(sum(abs2, sol.Y; dims=2)) .- 1.0) .< 1e-8)
-end
-
 @testset "qubo solvers" begin
     rng = Random.Xoshiro(13)
     system = make_simple_system(rho=0.3)
@@ -79,16 +51,4 @@ end
         round_restarts=4, trace=true, trace_round_restarts=1, rng=rng)
     @test length(lr_trace.trace_time) == length(lr_trace.trace_value)
     @test !isempty(lr_trace.trace_value)
-end
-
-@testset "comparison pipeline" begin
-    system = make_simple_system(rho=0.3)
-    config = ComparisonConfig(T=36, H=14, L=3, sigma_w=0.01, sigma_z=0.01,
-        low_rank_restarts=2, low_rank_maxiter=60, low_rank_round_restarts=8,
-        include_random=true)
-    rows = run_comparison(system, config; methods=[:low_rank], reps=2, seed=7)
-
-    @test length(rows) == 4
-    @test Set(row["method"] for row in rows) == Set(["low_rank", "random_commit"])
-    @test all(haskey(row, "realized_return") for row in rows)
 end

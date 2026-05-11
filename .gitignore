@@ -4,4 +4,5 @@ Manifest.toml
 results/*.csv
 results/*.json
 results/*.txt
+results/plots/*.svg
 !results/.gitkeep

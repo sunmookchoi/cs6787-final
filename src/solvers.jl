@@ -8,11 +8,6 @@ function _ensure_mosek_sdp_loaded!()
     return nothing
 end
 
-function quadratic_value(S::AbstractMatrix, x::AbstractVector)
-    xf = Float64.(x)
-    return 0.5 * dot(xf, S * xf)
-end
-
 function qubo_value(W::AbstractMatrix, x::AbstractVector)
     xf = Float64.(x)
     return dot(xf, W * xf)
@@ -91,27 +86,6 @@ function _trace_point!(times::Vector{Float64}, values::Vector{Float64},
     return nothing
 end
 
-function hyperplane_round_from_factor(S::AbstractMatrix, Y::AbstractMatrix;
-        restarts::Integer=128, rng::AbstractRNG=Random.default_rng())
-    d, r = size(Y)
-    @assert size(S) == (d, d)
-    @assert restarts >= 1
-
-    best_x = sign_vector(@view Y[:, 1])
-    best_val = quadratic_value(S, best_x)
-
-    for _ in 1:restarts
-        g = randn(rng, r)
-        x = sign_vector(Y * g)
-        val = quadratic_value(S, x)
-        if val > best_val
-            best_x = x
-            best_val = val
-        end
-    end
-    return best_x, best_val
-end
-
 function _hyperplane_round_qubo_prepared(W::AbstractMatrix, Y::AbstractMatrix;
         restarts::Integer=128, rng::AbstractRNG=Random.default_rng())
     d, r = size(Y)
@@ -160,20 +134,6 @@ function _normalize_rows!(Y::AbstractMatrix, rng::AbstractRNG)
         @views Y[i, :] ./= nrm
     end
     return Y
-end
-
-function _factor_half_objective(S::AbstractMatrix, Y::AbstractMatrix)
-    return 0.5 * dot(Y, S * Y)
-end
-
-function _projected_gradient(S::AbstractMatrix, Y::AbstractMatrix)
-    G = S * Y
-    coeff = sum(G .* Y; dims=2)
-    return G .- coeff .* Y
-end
-
-function default_factor_rank(d::Integer)
-    return min(d, max(2, ceil(Int, sqrt(2d))))
 end
 
 function sign_iteration(W::AbstractMatrix; restarts::Integer=32,
@@ -538,101 +498,6 @@ function low_rank_sdp_qubo(W::AbstractMatrix; rank::Integer=10,
     )
 end
 
-function low_rank_sdp_factorization(S::AbstractMatrix; rank::Integer=0,
-        restarts::Integer=8, maxiter::Integer=1000, step_size=nothing,
-        tol::Real=1e-7, round_restarts::Integer=128,
-        rng::AbstractRNG=Random.default_rng())
-    @assert size(S, 1) == size(S, 2) "S must be square"
-    @assert restarts >= 1
-    @assert maxiter >= 1
-
-    Ssym = 0.5 .* (S .+ S')
-    d = size(Ssym, 1)
-    r = rank <= 0 ? default_factor_rank(d) : min(rank, d)
-    base_step = isnothing(step_size) ? 0.5 / _operator_norm_bound(Ssym) : Float64(step_size)
-
-    best_Y = Matrix{Float64}(undef, 0, 0)
-    best_relaxed = -Inf
-    best_iter = 0
-    best_grad_norm = Inf
-    best_converged = false
-
-    for _ in 1:restarts
-        Y = _random_factor(d, r, rng)
-        val = _factor_half_objective(Ssym, Y)
-        step = base_step
-        iter_done = 0
-        grad_norm = Inf
-        converged = false
-
-        for iter in 1:maxiter
-            G = _projected_gradient(Ssym, Y)
-            grad_norm = norm(G) / sqrt(length(G))
-            if grad_norm <= tol
-                converged = true
-                iter_done = iter
-                break
-            end
-
-            accepted = false
-            trial_step = step
-            Y_trial = similar(Y)
-            trial_val = val
-
-            for _ in 1:25
-                copyto!(Y_trial, Y)
-                Y_trial .+= trial_step .* G
-                _normalize_rows!(Y_trial, rng)
-                trial_val = _factor_half_objective(Ssym, Y_trial)
-                if trial_val >= val - 1e-12
-                    accepted = true
-                    break
-                end
-                trial_step *= 0.5
-            end
-
-            if !accepted
-                iter_done = iter
-                break
-            end
-
-            improvement = trial_val - val
-            Y, Y_trial = Y_trial, Y
-            val = trial_val
-            step = min(1.05 * trial_step, 10 * base_step)
-            iter_done = iter
-
-            if abs(improvement) <= Float64(tol) * max(1.0, abs(val))
-                converged = true
-                break
-            end
-        end
-
-        if val > best_relaxed
-            best_Y = copy(Y)
-            best_relaxed = val
-            best_iter = iter_done
-            best_grad_norm = grad_norm
-            best_converged = converged
-        end
-    end
-
-    x, rounded = hyperplane_round_from_factor(Ssym, best_Y; restarts=round_restarts, rng=rng)
-    return (
-        method = :low_rank,
-        x = x,
-        Y = best_Y,
-        relaxed_value = best_relaxed,
-        rounded_value = rounded,
-        rank = r,
-        restarts = restarts,
-        iterations = best_iter,
-        grad_norm = best_grad_norm,
-        converged = best_converged,
-        status = best_converged ? "converged" : "maxiter_or_stalled",
-    )
-end
-
 function _sdp_hyperplane_round_qubo(W::AbstractMatrix, X::AbstractMatrix;
         restarts::Integer=128, rng::AbstractRNG=Random.default_rng())
     d = size(X, 1)
@@ -648,26 +513,6 @@ function _sdp_hyperplane_round_qubo(W::AbstractMatrix, X::AbstractMatrix;
 
     V = U[:, keep] .* sqrt.(lam[keep])'
     return _hyperplane_round_qubo_prepared(W, V; restarts=restarts, rng=rng)
-end
-
-function solve_sdp_gw(S::AbstractMatrix; restarts::Integer=128,
-        rng::AbstractRNG=Random.default_rng())
-    _ensure_mosek_sdp_loaded!()
-    sdp_obj, X = Base.invokelatest(max_trSX_diag1_psd_mosek_task, S)
-    x, rounded = Base.invokelatest(sdp_hyperplane_round, S, X; restarts=restarts, rng=rng)
-    return (
-        method = :sdp_gw,
-        x = x,
-        X = X,
-        relaxed_value = 0.5 * sdp_obj,
-        rounded_value = rounded,
-        rank = missing,
-        restarts = restarts,
-        iterations = missing,
-        grad_norm = missing,
-        converged = true,
-        status = "solved",
-    )
 end
 
 function solve_sdp_gw_qubo(W::AbstractMatrix; restarts::Integer=128,

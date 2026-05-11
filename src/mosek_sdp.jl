@@ -78,20 +78,3 @@ function max_trSX_diag1_psd_mosek_task(S::AbstractMatrix)
 
     return objval, Xopt
 end
-
-function sdp_hyperplane_round(S::AbstractMatrix, X::AbstractMatrix;
-        restarts::Integer=128, rng::AbstractRNG=Random.default_rng())
-    d = size(X, 1)
-    Xsym = 0.5 .* (X .+ X')
-    lam, U = eigen(Xsym)
-    lam = max.(lam, 0.0)
-    keep = lam .> 1e-10
-
-    if !any(keep)
-        x = random_sign_vector(rng, d)
-        return x, quadratic_value(S, x)
-    end
-
-    V = U[:, keep] .* sqrt.(lam[keep])'
-    return hyperplane_round_from_factor(S, V; restarts=restarts, rng=rng)
-end
