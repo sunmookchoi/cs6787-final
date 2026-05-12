@@ -1,6 +1,8 @@
 .DS_Store
 Manifest.toml
 *.log
+mosek.lic
+mosek/
 results/*.csv
 results/*.json
 results/*.txt
