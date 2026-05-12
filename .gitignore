@@ -1,9 +1,16 @@
 .DS_Store
+.mplconfig/
+.venv/
 Manifest.toml
 *.log
+mosek.lic
+mosek/
 results/*.csv
 results/*.json
 results/*.txt
+results/ablation_studies/*.csv
+results/ablation_studies/*.png
+!results/ablation_studies/.gitkeep
 results/plots/*.svg
 results/*_plots/*.svg
 !results/.gitkeep
