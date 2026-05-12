@@ -5,4 +5,5 @@ results/*.csv
 results/*.json
 results/*.txt
 results/plots/*.svg
+results/*_plots/*.svg
 !results/.gitkeep

@@ -1,13 +1,15 @@
 #!/usr/bin/env julia
 
 using CS6787Final
+using LinearAlgebra
 using Printf
 using Random
 using Statistics
 
 const QUBO_COLUMNS = [
-    "rep", "T", "d", "action_dim", "method", "method_label", "status",
-    "rank", "binary_objective", "normalized_binary_quality",
+    "system", "system_seed", "rho_A", "n", "p", "rep", "T", "d",
+    "action_dim", "method", "method_label", "status", "rank",
+    "binary_objective", "normalized_binary_quality",
     "quality_ref_binary_objective", "continuous_objective",
     "best_continuous_objective", "relaxed_objective", "solve_seconds",
     "allocated_bytes", "gc_seconds", "maxrss_bytes", "maxrss_mb",
@@ -17,8 +19,9 @@ const QUBO_COLUMNS = [
 ]
 
 const ANYTIME_COLUMNS = [
-    "rep", "T", "d", "method", "method_label", "rank", "trace_index",
-    "wall_seconds", "best_binary_objective",
+    "system", "system_seed", "rho_A", "n", "p", "rep", "T", "d",
+    "method", "method_label", "rank", "trace_index", "wall_seconds",
+    "best_binary_objective",
 ]
 
 function parse_args(args)
@@ -109,6 +112,42 @@ end
 
 nt_get(nt::NamedTuple, key::Symbol, default) = haskey(nt, key) ? nt[key] : default
 
+function spectral_radius(A::AbstractMatrix)
+    return maximum(abs.(eigvals(Matrix(A))))
+end
+
+function make_benchmark_system(parsed, seed::Integer)
+    system_name = lowercase(strip(opt(parsed, "system", "simple")))
+    n = opt_int(parsed, "n", 3)
+    p = opt_int(parsed, "p", 2)
+
+    if system_name in ("simple", "current", "deterministic")
+        rho = opt_float(parsed, "rho", 0.3)
+        system = make_simple_system(rho=rho)
+        return system, (
+            system = "simple",
+            system_seed = missing,
+            rho_A = spectral_radius(system.A),
+            n = size(system.A, 1),
+            p = size(system.B, 2),
+        )
+    elseif system_name == "random"
+        rho = opt_float(parsed, "rho", 0.5)
+        system_seed = opt_int(parsed, "system-seed", 1)
+        rng = Random.Xoshiro(system_seed)
+        system = make_random_system(n, p; rho=rho, rng=rng)
+        return system, (
+            system = "random",
+            system_seed = system_seed,
+            rho_A = spectral_radius(system.A),
+            n = n,
+            p = p,
+        )
+    end
+
+    error("--system must be simple/current/deterministic or random")
+end
+
 function method_label(method::Symbol, rank)
     if method == :low_rank
         return "LR-SDP r=$(rank)"
@@ -163,11 +202,16 @@ function solve_method(method::Symbol, W::AbstractMatrix, parsed, rank, rng,
     error("Unknown method: $(method)")
 end
 
-function success_row(rep, T, action_dim, method, rank, sol, timed, matrix_time,
-        matrix_bytes)
+function success_row(system_info, rep, T, action_dim, method, rank, sol, timed,
+        matrix_time, matrix_bytes)
     rounded = nt_get(sol, :binary_value, nt_get(sol, :rounded_value, missing))
     rss = Sys.maxrss()
     return Dict{String,Any}(
+        "system" => system_info.system,
+        "system_seed" => system_info.system_seed,
+        "rho_A" => system_info.rho_A,
+        "n" => system_info.n,
+        "p" => system_info.p,
         "rep" => rep,
         "T" => T,
         "d" => length(sol.x),
@@ -199,10 +243,15 @@ function success_row(rep, T, action_dim, method, rank, sol, timed, matrix_time,
     )
 end
 
-function failure_row(rep, T, d, action_dim, method, rank, err, matrix_time,
-        matrix_bytes)
+function failure_row(system_info, rep, T, d, action_dim, method, rank, err,
+        matrix_time, matrix_bytes)
     rss = Sys.maxrss()
     return Dict{String,Any}(
+        "system" => system_info.system,
+        "system_seed" => system_info.system_seed,
+        "rho_A" => system_info.rho_A,
+        "n" => system_info.n,
+        "p" => system_info.p,
         "rep" => rep,
         "T" => T,
         "d" => d,
@@ -246,11 +295,16 @@ function work_count_label(row)
     return "starts=$(starts)"
 end
 
-function append_anytime_rows!(rows, rep, T, d, method, rank, sol)
+function append_anytime_rows!(rows, system_info, rep, T, d, method, rank, sol)
     times = nt_get(sol, :trace_time, Float64[])
     values = nt_get(sol, :trace_value, Float64[])
     for (idx, (t, val)) in enumerate(zip(times, values))
         push!(rows, Dict{String,Any}(
+            "system" => system_info.system,
+            "system_seed" => system_info.system_seed,
+            "rho_A" => system_info.rho_A,
+            "n" => system_info.n,
+            "p" => system_info.p,
             "rep" => rep,
             "T" => T,
             "d" => d,
@@ -266,9 +320,9 @@ function append_anytime_rows!(rows, rep, T, d, method, rank, sol)
 end
 
 function add_normalized_quality!(rows)
-    groups = Dict{Tuple{Any,Any},Vector{Dict{String,Any}}}()
+    groups = Dict{Tuple{Any,Any,Any},Vector{Dict{String,Any}}}()
     for row in rows
-        key = (row["rep"], row["T"])
+        key = (row["system"], row["rep"], row["T"])
         push!(get!(groups, key, Dict{String,Any}[]), row)
     end
 
@@ -496,6 +550,91 @@ function write_line_svg(path, title, xlabel, ylabel, series; logy=false,
     return path
 end
 
+function write_grouped_bar_svg(path, title, xlabel, ylabel, series)
+    isempty(series) && return nothing
+    mkpath(dirname(path))
+
+    x_values = sort(unique(reduce(vcat, [s.xs for s in series])))
+    isempty(x_values) && return nothing
+
+    by_label = Dict(s.label => Dict(zip(s.xs, s.ys)) for s in series)
+    all_y = Float64[]
+    for s in series
+        append!(all_y, s.ys)
+    end
+    isempty(all_y) && return nothing
+
+    y0 = 0.0
+    y1 = maximum(all_y)
+    y1 <= 0 && (y1 = 1.0)
+    y1 *= 1.08
+
+    width = 980
+    height = 560
+    left = 82
+    right = 220
+    top = 54
+    bottom = 86
+    plot_w = width - left - right
+    plot_h = height - top - bottom
+    colors = [
+        "#1f77b4", "#d62728", "#2ca02c", "#9467bd", "#ff7f0e",
+        "#17becf", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22",
+    ]
+
+    group_w = plot_w / length(x_values)
+    bar_gap = 2.0
+    bar_w = max(2.0, 0.78 * group_w / length(series) - bar_gap)
+    sy(y) = top + (y1 - y) / (y1 - y0) * plot_h
+
+    open(path, "w") do io
+        println(io, """<svg xmlns="http://www.w3.org/2000/svg" width="$width" height="$height" viewBox="0 0 $width $height">""")
+        println(io, """<rect width="100%" height="100%" fill="white"/>""")
+        println(io, """<text x="$(left)" y="30" font-family="Arial" font-size="20" font-weight="700">$(xml_escape(title))</text>""")
+        println(io, """<line x1="$left" y1="$(top + plot_h)" x2="$(left + plot_w)" y2="$(top + plot_h)" stroke="#333" stroke-width="1.2"/>""")
+        println(io, """<line x1="$left" y1="$top" x2="$left" y2="$(top + plot_h)" stroke="#333" stroke-width="1.2"/>""")
+
+        for t in 0:4
+            y = y0 + t * (y1 - y0) / 4
+            py = sy(y)
+            println(io, """<line x1="$(left - 5)" y1="$py" x2="$left" y2="$py" stroke="#333"/>""")
+            println(io, """<line x1="$left" y1="$py" x2="$(left + plot_w)" y2="$py" stroke="#e8e8e8"/>""")
+            println(io, """<text x="$(left - 10)" y="$(py + 4)" text-anchor="end" font-family="Arial" font-size="12">$(nice_num(y))</text>""")
+        end
+
+        for (x_idx, x) in enumerate(x_values)
+            group_left = left + (x_idx - 1) * group_w
+            group_center = group_left + group_w / 2
+            println(io, """<text x="$group_center" y="$(top + plot_h + 24)" text-anchor="middle" font-family="Arial" font-size="12">$(nice_num(x))</text>""")
+
+            bars_total_w = length(series) * bar_w + (length(series) - 1) * bar_gap
+            start_x = group_center - bars_total_w / 2
+            for (series_idx, s) in enumerate(series)
+                y = get(by_label[s.label], x, missing)
+                y === missing && continue
+                color = colors[mod1(series_idx, length(colors))]
+                bx = start_x + (series_idx - 1) * (bar_w + bar_gap)
+                by = sy(y)
+                bh = top + plot_h - by
+                println(io, """<rect x="$bx" y="$by" width="$bar_w" height="$bh" fill="$color"/>""")
+            end
+        end
+
+        println(io, """<text x="$(left + plot_w / 2)" y="$(height - 24)" text-anchor="middle" font-family="Arial" font-size="14">$(xml_escape(xlabel))</text>""")
+        println(io, """<text transform="translate(22,$(top + plot_h / 2)) rotate(-90)" text-anchor="middle" font-family="Arial" font-size="14">$(xml_escape(ylabel))</text>""")
+
+        for (idx, s) in enumerate(series)
+            color = colors[mod1(idx, length(colors))]
+            legend_y = top + 22 * (idx - 1)
+            println(io, """<rect x="$(left + plot_w + 28)" y="$(legend_y - 10)" width="18" height="12" fill="$color"/>""")
+            println(io, """<text x="$(left + plot_w + 56)" y="$(legend_y + 1)" font-family="Arial" font-size="12">$(xml_escape(s.label))</text>""")
+        end
+
+        println(io, "</svg>")
+    end
+    return path
+end
+
 function write_plots(plot_dir, rows, rank_Ts)
     mkpath(plot_dir)
     quality = summarize_series(rows, "T", "binary_objective")
@@ -508,8 +647,8 @@ function write_plots(plot_dir, rows, rank_Ts)
         "Runtime vs T", "T", "seconds (log scale)", runtime; logy=true)
 
     peak = summarize_series(rows, "T", "maxrss_mb")
-    write_line_svg(joinpath(plot_dir, "figure3_peak_memory_vs_T.svg"),
-        "Peak Memory Usage vs T", "T", "MB (log scale)", peak; logy=true)
+    write_grouped_bar_svg(joinpath(plot_dir, "figure3_peak_memory_vs_T.svg"),
+        "Peak Memory Usage vs T", "T", "peak memory (MB)", peak)
 
     rank_set = Set(Float64.(rank_Ts))
     rank_rows = [row for row in rows if row["method"] == "low_rank" &&
@@ -526,12 +665,8 @@ function write_plots(plot_dir, rows, rank_Ts)
     return plot_dir
 end
 
-function run_anytime_benchmark(parsed, system, seed, rep)
-    T = opt_int(parsed, "anytime-T", 2000)
+function run_anytime_benchmark(parsed, system, system_info, seed, rep, Ts)
     ranks = parse_int_list(opt(parsed, "anytime-ranks", "4,8"))
-    matrix_timed = @timed build_true_qubo_matrix(system, T)
-    W = matrix_timed.value
-    d = size(W, 1)
     rows = Dict{String,Any}[]
 
     cases = Tuple{Symbol,Any}[
@@ -540,32 +675,45 @@ function run_anytime_benchmark(parsed, system, seed, rep)
     ]
     append!(cases, [(:low_rank, rank) for rank in ranks])
 
-    for (case_idx, (method, rank)) in enumerate(cases)
-        rng_seed = seed + 9_000_000 * rep + 10_000 * T + 1_003 * case_idx +
-            (rank === missing ? 0 : rank)
-        rng = Random.Xoshiro(rng_seed)
-        try
-            sol = solve_method(method, W, parsed, rank, rng, T; trace=true)
-            append_anytime_rows!(rows, rep, T, d, method, rank, sol)
-            @printf("anytime %-14s rep=%d T=%4d points=%d final=% .6e\n",
-                method_label(method, rank), rep, T,
-                length(nt_get(sol, :trace_value, Float64[])),
-                Float64(nt_get(sol, :binary_value, nt_get(sol, :rounded_value, NaN))))
-        catch err
-            @warn "anytime case failed" rep T method rank err
+    for T in Ts
+        matrix_timed = @timed build_true_qubo_matrix(system, T)
+        W = matrix_timed.value
+        d = size(W, 1)
+
+        for (case_idx, (method, rank)) in enumerate(cases)
+            rng_seed = seed + 9_000_000 * rep + 10_000 * T + 1_003 * case_idx +
+                (rank === missing ? 0 : rank)
+            rng = Random.Xoshiro(rng_seed)
+            try
+                sol = solve_method(method, W, parsed, rank, rng, T; trace=true)
+                append_anytime_rows!(rows, system_info, rep, T, d, method, rank, sol)
+                @printf("anytime %-14s rep=%d T=%4d points=%d final=% .6e\n",
+                    method_label(method, rank), rep, T,
+                    length(nt_get(sol, :trace_value, Float64[])),
+                    Float64(nt_get(sol, :binary_value, nt_get(sol, :rounded_value, NaN))))
+            catch err
+                @warn "anytime case failed" rep T method rank err
+            end
+            GC.gc()
         end
-        GC.gc()
     end
     return rows
 end
 
-function write_anytime_plot(plot_dir, rows)
+function write_anytime_plots(plot_dir, rows)
     isempty(rows) && return nothing
-    series = summarize_series(rows, "wall_seconds", "best_binary_objective")
-    T = first(rows)["T"]
-    write_line_svg(joinpath(plot_dir, "figure5_anytime_T$(T).svg"),
-        "Anytime Performance at T=$(T)", "wall-clock seconds",
-        "best binary objective so far", series)
+    grouped = Dict{Int,Vector{Dict{String,Any}}}()
+    for row in rows
+        T = Int(row["T"])
+        push!(get!(grouped, T, Dict{String,Any}[]), row)
+    end
+
+    for T in sort(collect(keys(grouped)))
+        series = summarize_series(grouped[T], "wall_seconds", "best_binary_objective")
+        write_line_svg(joinpath(plot_dir, "figure5_anytime_T$(T).svg"),
+            "Anytime Performance at T=$(T)", "wall-clock seconds",
+            "best binary objective so far", series)
+    end
     return plot_dir
 end
 
@@ -590,23 +738,29 @@ end
 
 function main(args)
     parsed = parse_args(args)
-    Ts = parse_int_list(opt(parsed, "Ts", "100:100:2000"))
+    Ts = parse_int_list(opt(parsed, "Ts", "200:200:4000"))
     ranks = parse_int_list(opt(parsed, "ranks", "2,4,6,8"))
-    rank_Ts = parse_int_list(opt(parsed, "rank-Ts", "500,1000,1500,2000"))
+    rank_Ts = parse_int_list(opt(parsed, "rank-Ts", "1000,2000,3000,4000"))
     methods = parse_methods(opt(parsed, "methods",
         "sign_iteration,box_pgd,low_rank,sdp_gw"))
-    sdp_max_T = opt_int(parsed, "sdp-max-T", 300)
+    sdp_max_T = opt_int(parsed, "sdp-max-T", 2000)
     reps = opt_int(parsed, "reps", 1)
     seed = opt_int(parsed, "seed", 1)
     output = opt(parsed, "output", joinpath(@__DIR__, "..", "results",
         "qubo_benchmark.csv"))
-    plot_dir = opt(parsed, "plot-dir", joinpath(dirname(output), "plots"))
+    output_stem = splitext(basename(output))[1]
+    plot_dir = opt(parsed, "plot-dir", joinpath(dirname(output),
+        "$(output_stem)_plots"))
     anytime_output = opt(parsed, "anytime-output",
-        joinpath(dirname(output), "anytime_trace.csv"))
+        joinpath(dirname(output), "$(output_stem)_anytime_trace.csv"))
 
-    system = make_simple_system(rho=opt_float(parsed, "rho", 0.3))
+    system, system_info = make_benchmark_system(parsed, seed)
     _, action_dim = size(system.B)
     rows = Dict{String,Any}[]
+
+    @printf("system=%s n=%d p=%d rho_A=%.4f seed=%s\n",
+        system_info.system, system_info.n, system_info.p,
+        Float64(system_info.rho_A), string(system_info.system_seed))
 
     warmup_methods(parsed, methods, ranks, system, seed)
 
@@ -632,8 +786,9 @@ function main(args)
                     rng = Random.Xoshiro(rng_seed)
                     try
                         timed = @timed solve_method(method, W, parsed, rank, rng, T)
-                        push!(rows, success_row(rep, T, action_dim, method, rank,
-                            timed.value, timed, matrix_time, matrix_bytes))
+                        push!(rows, success_row(system_info, rep, T, action_dim,
+                            method, rank, timed.value, timed, matrix_time,
+                            matrix_bytes))
                         row = rows[end]
                         @printf("%-14s T=%4d d=%4d %s obj=% .6e sec=%.3f rss=%s\n",
                             row["method_label"], T, d,
@@ -642,8 +797,8 @@ function main(args)
                             Float64(row["solve_seconds"]),
                             string(row["maxrss_bytes"]))
                     catch err
-                        push!(rows, failure_row(rep, T, d, action_dim, method,
-                            rank, err, matrix_time, matrix_bytes))
+                        push!(rows, failure_row(system_info, rep, T, d, action_dim,
+                            method, rank, err, matrix_time, matrix_bytes))
                         @warn "benchmark case failed" rep T method rank err
                     end
                     GC.gc()
@@ -659,9 +814,12 @@ function main(args)
     if !haskey(parsed, "no-plots")
         write_plots(plot_dir, rows, rank_Ts)
         if !haskey(parsed, "no-anytime")
-            anytime_rows = run_anytime_benchmark(parsed, system, seed, 1)
+            anytime_Ts = haskey(parsed, "anytime-T") ?
+                parse_int_list(parsed["anytime-T"]) : Ts
+            anytime_rows = run_anytime_benchmark(parsed, system, system_info,
+                seed, 1, anytime_Ts)
             write_anytime_csv(anytime_output, anytime_rows)
-            write_anytime_plot(plot_dir, anytime_rows)
+            write_anytime_plots(plot_dir, anytime_rows)
             @printf("wrote anytime trace to %s\n", anytime_output)
         end
         @printf("wrote plots to %s\n", plot_dir)

@@ -6,9 +6,14 @@ using Test
 @testset "qubo solvers" begin
     rng = Random.Xoshiro(13)
     system = make_simple_system(rho=0.3)
+    random_system = make_random_system(3, 2; rho=0.5, rng=Random.Xoshiro(14))
     W = build_true_qubo_matrix(system, 8)
     M = build_M_true(system, 8)
 
+    @test size(random_system.A) == (3, 3)
+    @test size(random_system.B) == (3, 2)
+    @test size(random_system.C) == (2, 3)
+    @test maximum(abs.(eigvals(Matrix(random_system.A)))) ≈ 0.5
     @test size(W) == (18, 18)
     @test all(diag(W) .== 0.0)
     @test W ≈ 0.5 .* (M .+ M')

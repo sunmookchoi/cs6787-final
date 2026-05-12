@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="540" viewBox="0 0 920 540">
+<rect width="100%" height="100%" fill="white"/>
+<text x="86" y="32" font-family="Arial" font-size="20" font-weight="700">LR-SDP r=6 Rounding Restarts Ablation</text>
+<line x1="86" y1="458" x2="730" y2="458" stroke="#333" stroke-width="1.2"/>
+<line x1="86" y1="58" x2="86" y2="458" stroke="#333" stroke-width="1.2"/>
+<line x1="81" y1="458.0" x2="86" y2="458.0" stroke="#333"/>
+<line x1="86" y1="458.0" x2="730" y2="458.0" stroke="#e8e8e8"/>
+<text x="76" y="462.0" text-anchor="end" font-family="Arial" font-size="12">5707</text>
+<line x1="81" y1="357.99999999939473" x2="86" y2="357.99999999939473" stroke="#333"/>
+<line x1="86" y1="357.99999999939473" x2="730" y2="357.99999999939473" stroke="#e8e8e8"/>
+<text x="76" y="361.99999999939473" text-anchor="end" font-family="Arial" font-size="12">5707</text>
+<line x1="81" y1="258.0" x2="86" y2="258.0" stroke="#333"/>
+<line x1="86" y1="258.0" x2="730" y2="258.0" stroke="#e8e8e8"/>
+<text x="76" y="262.0" text-anchor="end" font-family="Arial" font-size="12">5707</text>
+<line x1="81" y1="158.0000000006052" x2="86" y2="158.0000000006052" stroke="#333"/>
+<line x1="86" y1="158.0000000006052" x2="730" y2="158.0000000006052" stroke="#e8e8e8"/>
+<text x="76" y="162.0000000006052" text-anchor="end" font-family="Arial" font-size="12">5707</text>
+<line x1="81" y1="58.0" x2="86" y2="58.0" stroke="#333"/>
+<line x1="86" y1="58.0" x2="730" y2="58.0" stroke="#e8e8e8"/>
+<text x="76" y="62.0" text-anchor="end" font-family="Arial" font-size="12">5707</text>
+<line x1="86.0" y1="458" x2="86.0" y2="463" stroke="#333"/>
+<text x="86.0" y="482" text-anchor="middle" font-family="Arial" font-size="12">10.0</text>
+<line x1="247.0" y1="458" x2="247.0" y2="463" stroke="#333"/>
+<text x="247.0" y="482" text-anchor="middle" font-family="Arial" font-size="12">20.0</text>
+<line x1="408.0" y1="458" x2="408.0" y2="463" stroke="#333"/>
+<text x="408.0" y="482" text-anchor="middle" font-family="Arial" font-size="12">30.0</text>
+<line x1="569.0" y1="458" x2="569.0" y2="463" stroke="#333"/>
+<text x="569.0" y="482" text-anchor="middle" font-family="Arial" font-size="12">40.0</text>
+<line x1="730.0" y1="458" x2="730.0" y2="463" stroke="#333"/>
+<text x="730.0" y="482" text-anchor="middle" font-family="Arial" font-size="12">50.0</text>
+<path d="M 86.0 430.41379310353176 L 247.0 430.41379310353176 L 408.0 430.41379310353176 L 569.0 430.41379310353176 L 730.0 430.41379310353176" fill="none" stroke="#1f77b4" stroke-width="2.3"/>
+<circle cx="86.0" cy="430.41379310353176" r="2.8" fill="#1f77b4"/>
+<circle cx="247.0" cy="430.41379310353176" r="2.8" fill="#1f77b4"/>
+<circle cx="408.0" cy="430.41379310353176" r="2.8" fill="#1f77b4"/>
+<circle cx="569.0" cy="430.41379310353176" r="2.8" fill="#1f77b4"/>
+<circle cx="730.0" cy="430.41379310353176" r="2.8" fill="#1f77b4"/>
+<path d="M 86.0 85.58620689646824 L 247.0 85.58620689646824 L 408.0 85.58620689646824 L 569.0 85.58620689646824 L 730.0 85.58620689646824" fill="none" stroke="#d62728" stroke-width="2.3"/>
+<circle cx="86.0" cy="85.58620689646824" r="2.8" fill="#d62728"/>
+<circle cx="247.0" cy="85.58620689646824" r="2.8" fill="#d62728"/>
+<circle cx="408.0" cy="85.58620689646824" r="2.8" fill="#d62728"/>
+<circle cx="569.0" cy="85.58620689646824" r="2.8" fill="#d62728"/>
+<circle cx="730.0" cy="85.58620689646824" r="2.8" fill="#d62728"/>
+<path d="M 86.0 85.58620689646824 L 247.0 85.58620689646824 L 408.0 85.58620689646824 L 569.0 85.58620689646824 L 730.0 85.58620689646824" fill="none" stroke="#2ca02c" stroke-width="2.3"/>
+<circle cx="86.0" cy="85.58620689646824" r="2.8" fill="#2ca02c"/>
+<circle cx="247.0" cy="85.58620689646824" r="2.8" fill="#2ca02c"/>
+<circle cx="408.0" cy="85.58620689646824" r="2.8" fill="#2ca02c"/>
+<circle cx="569.0" cy="85.58620689646824" r="2.8" fill="#2ca02c"/>
+<circle cx="730.0" cy="85.58620689646824" r="2.8" fill="#2ca02c"/>
+<path d="M 86.0 85.58620689646824 L 247.0 85.58620689646824 L 408.0 85.58620689646824 L 569.0 85.58620689646824 L 730.0 85.58620689646824" fill="none" stroke="#9467bd" stroke-width="2.3"/>
+<circle cx="86.0" cy="85.58620689646824" r="2.8" fill="#9467bd"/>
+<circle cx="247.0" cy="85.58620689646824" r="2.8" fill="#9467bd"/>
+<circle cx="408.0" cy="85.58620689646824" r="2.8" fill="#9467bd"/>
+<circle cx="569.0" cy="85.58620689646824" r="2.8" fill="#9467bd"/>
+<circle cx="730.0" cy="85.58620689646824" r="2.8" fill="#9467bd"/>
+<path d="M 86.0 85.58620689646824 L 247.0 85.58620689646824 L 408.0 85.58620689646824 L 569.0 85.58620689646824 L 730.0 85.58620689646824" fill="none" stroke="#ff7f0e" stroke-width="2.3"/>
+<circle cx="86.0" cy="85.58620689646824" r="2.8" fill="#ff7f0e"/>
+<circle cx="247.0" cy="85.58620689646824" r="2.8" fill="#ff7f0e"/>
+<circle cx="408.0" cy="85.58620689646824" r="2.8" fill="#ff7f0e"/>
+<circle cx="569.0" cy="85.58620689646824" r="2.8" fill="#ff7f0e"/>
+<circle cx="730.0" cy="85.58620689646824" r="2.8" fill="#ff7f0e"/>
+<path d="M 86.0 85.58620689646824 L 247.0 85.58620689646824 L 408.0 85.58620689646824 L 569.0 85.58620689646824 L 730.0 85.58620689646824" fill="none" stroke="#17becf" stroke-width="2.3"/>
+<circle cx="86.0" cy="85.58620689646824" r="2.8" fill="#17becf"/>
+<circle cx="247.0" cy="85.58620689646824" r="2.8" fill="#17becf"/>
+<circle cx="408.0" cy="85.58620689646824" r="2.8" fill="#17becf"/>
+<circle cx="569.0" cy="85.58620689646824" r="2.8" fill="#17becf"/>
+<circle cx="730.0" cy="85.58620689646824" r="2.8" fill="#17becf"/>
+<path d="M 86.0 85.58620689646824 L 247.0 85.58620689646824 L 408.0 85.58620689646824 L 569.0 85.58620689646824 L 730.0 85.58620689646824" fill="none" stroke="#8c564b" stroke-width="2.3"/>
+<circle cx="86.0" cy="85.58620689646824" r="2.8" fill="#8c564b"/>
+<circle cx="247.0" cy="85.58620689646824" r="2.8" fill="#8c564b"/>
+<circle cx="408.0" cy="85.58620689646824" r="2.8" fill="#8c564b"/>
+<circle cx="569.0" cy="85.58620689646824" r="2.8" fill="#8c564b"/>
+<circle cx="730.0" cy="85.58620689646824" r="2.8" fill="#8c564b"/>
+<path d="M 86.0 85.58620689646824 L 247.0 85.58620689646824 L 408.0 85.58620689646824 L 569.0 85.58620689646824 L 730.0 85.58620689646824" fill="none" stroke="#e377c2" stroke-width="2.3"/>
+<circle cx="86.0" cy="85.58620689646824" r="2.8" fill="#e377c2"/>
+<circle cx="247.0" cy="85.58620689646824" r="2.8" fill="#e377c2"/>
+<circle cx="408.0" cy="85.58620689646824" r="2.8" fill="#e377c2"/>
+<circle cx="569.0" cy="85.58620689646824" r="2.8" fill="#e377c2"/>
+<circle cx="730.0" cy="85.58620689646824" r="2.8" fill="#e377c2"/>
+<path d="M 86.0 85.58620689646824 L 247.0 85.58620689646824 L 408.0 85.58620689646824 L 569.0 85.58620689646824 L 730.0 85.58620689646824" fill="none" stroke="#1f77b4" stroke-width="2.3"/>
+<circle cx="86.0" cy="85.58620689646824" r="2.8" fill="#1f77b4"/>
+<circle cx="247.0" cy="85.58620689646824" r="2.8" fill="#1f77b4"/>
+<circle cx="408.0" cy="85.58620689646824" r="2.8" fill="#1f77b4"/>
+<circle cx="569.0" cy="85.58620689646824" r="2.8" fill="#1f77b4"/>
+<circle cx="730.0" cy="85.58620689646824" r="2.8" fill="#1f77b4"/>
+<path d="M 86.0 85.58620689646824 L 247.0 85.58620689646824 L 408.0 85.58620689646824 L 569.0 85.58620689646824 L 730.0 85.58620689646824" fill="none" stroke="#d62728" stroke-width="2.3"/>
+<circle cx="86.0" cy="85.58620689646824" r="2.8" fill="#d62728"/>
+<circle cx="247.0" cy="85.58620689646824" r="2.8" fill="#d62728"/>
+<circle cx="408.0" cy="85.58620689646824" r="2.8" fill="#d62728"/>
+<circle cx="569.0" cy="85.58620689646824" r="2.8" fill="#d62728"/>
+<circle cx="730.0" cy="85.58620689646824" r="2.8" fill="#d62728"/>
+<text x="408.0" y="516" text-anchor="middle" font-family="Arial" font-size="14">round restarts</text>
+<text transform="translate(24,258.0) rotate(-90)" text-anchor="middle" font-family="Arial" font-size="14">max binary objective over first K seeds</text>
+<line x1="758" y1="58" x2="778" y2="58" stroke="#1f77b4" stroke-width="2.3"/>
+<text x="788" y="62" font-family="Arial" font-size="12">K=1</text>
+<line x1="758" y1="82" x2="778" y2="82" stroke="#d62728" stroke-width="2.3"/>
+<text x="788" y="86" font-family="Arial" font-size="12">K=2</text>
+<line x1="758" y1="106" x2="778" y2="106" stroke="#2ca02c" stroke-width="2.3"/>
+<text x="788" y="110" font-family="Arial" font-size="12">K=3</text>
+<line x1="758" y1="130" x2="778" y2="130" stroke="#9467bd" stroke-width="2.3"/>
+<text x="788" y="134" font-family="Arial" font-size="12">K=4</text>
+<line x1="758" y1="154" x2="778" y2="154" stroke="#ff7f0e" stroke-width="2.3"/>
+<text x="788" y="158" font-family="Arial" font-size="12">K=5</text>
+<line x1="758" y1="178" x2="778" y2="178" stroke="#17becf" stroke-width="2.3"/>
+<text x="788" y="182" font-family="Arial" font-size="12">K=6</text>
+<line x1="758" y1="202" x2="778" y2="202" stroke="#8c564b" stroke-width="2.3"/>
+<text x="788" y="206" font-family="Arial" font-size="12">K=7</text>
+<line x1="758" y1="226" x2="778" y2="226" stroke="#e377c2" stroke-width="2.3"/>
+<text x="788" y="230" font-family="Arial" font-size="12">K=8</text>
+<line x1="758" y1="250" x2="778" y2="250" stroke="#1f77b4" stroke-width="2.3"/>
+<text x="788" y="254" font-family="Arial" font-size="12">K=9</text>
+<line x1="758" y1="274" x2="778" y2="274" stroke="#d62728" stroke-width="2.3"/>
+<text x="788" y="278" font-family="Arial" font-size="12">K=10</text>
+</svg>
