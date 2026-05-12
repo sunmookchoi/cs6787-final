@@ -7,6 +7,7 @@ using Printf
 using Random
 
 const SOLVER_COLUMNS = [
+    "system", "system_seed", "rho_A", "n", "p",
     "T", "d", "method", "method_label", "rank", "seed_index", "seed",
     "status", "binary_objective", "continuous_objective", "relaxed_objective",
     "solve_seconds", "rounding_seconds", "total_seconds", "iterations",
@@ -15,6 +16,7 @@ const SOLVER_COLUMNS = [
 ]
 
 const ROUNDING_COLUMNS = [
+    "system", "system_seed", "rho_A", "n", "p",
     "T", "d", "method", "method_label", "rank", "seed_index", "seed",
     "rounding_index", "sample_objective", "best_objective",
     "rounding_elapsed_seconds",
@@ -80,6 +82,59 @@ function method_label(method::Symbol, rank)
     method == :low_rank && return "LR-SDP r=$(rank)"
     method == :sdp_gw && return "SDP+GW"
     return String(method)
+end
+
+function spectral_radius(A::AbstractMatrix)
+    return maximum(abs.(eigvals(Matrix(A))))
+end
+
+function make_ablation_system(parsed)
+    system_name = lowercase(strip(opt(parsed, "system", "random")))
+    n = opt_int(parsed, "n", 3)
+    p = opt_int(parsed, "p", 2)
+
+    if system_name in ("simple", "current", "deterministic")
+        rho = opt_float(parsed, "rho", 0.3)
+        system = make_simple_system(rho=rho)
+        return system, (
+            system = "simple",
+            system_seed = missing,
+            rho_A = spectral_radius(system.A),
+            n = size(system.A, 1),
+            p = size(system.B, 2),
+        )
+    elseif system_name == "random"
+        rho = opt_float(parsed, "rho", 0.5)
+        system_seed = opt_int(parsed, "system-seed", 1)
+        rng = Random.Xoshiro(system_seed)
+        system = make_random_system(n, p; rho=rho, rng=rng)
+        return system, (
+            system = "random",
+            system_seed = system_seed,
+            rho_A = spectral_radius(system.A),
+            n = n,
+            p = p,
+        )
+    end
+
+    error("--system must be simple/current/deterministic or random")
+end
+
+function system_row(system_info)
+    return Dict{String,Any}(
+        "system" => system_info.system,
+        "system_seed" => system_info.system_seed,
+        "rho_A" => system_info.rho_A,
+        "n" => system_info.n,
+        "p" => system_info.p,
+    )
+end
+
+function print_system_matrix(name::AbstractString, M::AbstractMatrix)
+    println("[$(timestamp())] $name =")
+    show(stdout, "text/plain", Matrix(M))
+    println()
+    flush_progress()
 end
 
 function method_seed(base_seed::Integer, method_idx::Integer, seed_index::Integer;
@@ -288,10 +343,12 @@ function run_seeded_solver(method, W, rank, rng, parsed)
     error("Unknown seeded method: $(method)")
 end
 
-function write_rounding_trace!(path, T, d, method, rank, seed_index, seed, trace)
+function write_rounding_trace!(path, system_info, T, d, method, rank, seed_index,
+        seed, trace)
     label = method_label(method, rank)
     for row in trace
-        append_csv_row(path, ROUNDING_COLUMNS, Dict{String,Any}(
+        data = system_row(system_info)
+        merge!(data, Dict{String,Any}(
             "T" => T,
             "d" => d,
             "method" => String(method),
@@ -304,6 +361,7 @@ function write_rounding_trace!(path, T, d, method, rank, seed_index, seed, trace
             "best_objective" => row.best_objective,
             "rounding_elapsed_seconds" => row.rounding_elapsed_seconds,
         ))
+        append_csv_row(path, ROUNDING_COLUMNS, data)
     end
 end
 
@@ -342,7 +400,7 @@ function main(args)
     done = resume ? completed_solver_cases(solver_output) :
         Set{Tuple{String,String,Int}}()
 
-    system = make_simple_system(rho=opt_float(parsed, "rho", 0.3))
+    system, system_info = make_ablation_system(parsed)
     matrix_timed = @timed build_true_qubo_matrix(system, T)
     W = matrix_timed.value
     d = size(W, 1)
@@ -360,6 +418,12 @@ function main(args)
 
     @printf("[%s] ablation config: T=%d d=%d seeds=%d round_restarts=%d include_sdp=%s resume=%s\n",
         timestamp(), T, d, seeds_per_method, round_restarts, include_sdp, resume)
+    @printf("[%s] system=%s system_seed=%s n=%d p=%d rho_A=%.6f\n",
+        timestamp(), system_info.system, string(system_info.system_seed),
+        system_info.n, system_info.p, Float64(system_info.rho_A))
+    print_system_matrix("A", system.A)
+    print_system_matrix("B", system.B)
+    print_system_matrix("C", system.C)
     @printf("[%s] built W in %s, output_dir=%s\n",
         timestamp(), fmt_duration(matrix_timed.time), output_dir)
     @printf("[%s] outputs: solver=%s rounding=%s planned_cases=%d existing_completed=%d\n",
@@ -396,14 +460,15 @@ function main(args)
                 row = solver_row(T, d, method, rank, seed_index, seed, sol,
                     timed.time, rounding_seconds,
                     method == :low_rank ? round_restarts : missing)
+                merge!(row, system_row(system_info))
 
                 if method == :low_rank
                     round_rng = Random.Xoshiro(seed + 500_000_000)
                     rounding_timed = @timed rounding_trace_from_factor(W, sol.Y;
                         round_restarts=round_restarts, rng=round_rng)
                     rounding_seconds = rounding_timed.time
-                    write_rounding_trace!(rounding_output, T, d, method, rank,
-                        seed_index, seed, rounding_timed.value)
+                    write_rounding_trace!(rounding_output, system_info, T, d,
+                        method, rank, seed_index, seed, rounding_timed.value)
                     row["rounding_seconds"] = rounding_seconds
                     row["total_seconds"] = timed.time + rounding_seconds
                     row["binary_objective"] = rounding_timed.value[end].best_objective
@@ -421,6 +486,7 @@ function main(args)
                 row = failure_row(T, d, method, rank, seed_index, seed, err,
                     time() - case_start,
                     method == :low_rank ? round_restarts : missing)
+                merge!(row, system_row(system_info))
                 append_csv_row(solver_output, SOLVER_COLUMNS, row)
                 completed += 1
                 method_done += 1
@@ -457,10 +523,11 @@ function main(args)
                 round_rng = Random.Xoshiro(seed + 500_000_000)
                 rounding_timed = @timed rounding_trace_from_sdp(W, sol.X;
                     round_restarts=round_restarts, rng=round_rng)
-                write_rounding_trace!(rounding_output, T, d, method, rank,
-                    seed_index, seed, rounding_timed.value)
+                write_rounding_trace!(rounding_output, system_info, T, d, method,
+                    rank, seed_index, seed, rounding_timed.value)
                 row = solver_row(T, d, method, rank, seed_index, seed, sol,
                     timed.time, rounding_timed.time, round_restarts)
+                merge!(row, system_row(system_info))
                 row["binary_objective"] = rounding_timed.value[end].best_objective
                 append_csv_row(solver_output, SOLVER_COLUMNS, row)
                 completed += 1
@@ -469,6 +536,7 @@ function main(args)
             catch err
                 row = failure_row(T, d, method, rank, seed_index, seed, err,
                     time() - case_start, round_restarts)
+                merge!(row, system_row(system_info))
                 append_csv_row(solver_output, SOLVER_COLUMNS, row)
                 completed += 1
                 @warn "sdp case failed" err

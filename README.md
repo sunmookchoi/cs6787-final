@@ -44,6 +44,8 @@ src/
   mosek_sdp.jl     Optional MOSEK SDP solve
 scripts/
   run_qubo_benchmark.jl
+  run_ablation_studies.jl
+  plot_ablation_studies.jl
   run_lr_seed_ablation.jl
 test/
   runtests.jl
@@ -129,6 +131,25 @@ initializations and reports the best value at checkpoints
 `K=24,48,...,192`. Use `--seed-counts 64` or `--max-seeds 64` to report every
 `K=1,2,...,64`. Use `--Ts 1000,2000,4000` to draw one curve per horizon, or
 `--system random` for the default random system with `--system-seed 1`.
+
+Run the T=2000 ablation sweep used for group-size and GW-rounding figures:
+
+```bash
+julia --project=. scripts/run_ablation_studies.jl \
+  --system random \
+  --system-seed 1 \
+  --T 2000 \
+  --seeds 256 \
+  --round-restarts 64 \
+  --output-dir results/ablation_studies
+
+julia --project=. scripts/plot_ablation_studies.jl \
+  --input-dir results/ablation_studies \
+  --output-dir results/ablation_studies
+```
+
+The sweep writes `solver_results.csv` and `rounding_trace.csv`. The plotting
+script writes summary CSVs plus SVG figures in `results/ablation_studies/`.
 
 For a rounding-restart ablation, pass a range or list to `--round-restarts`:
 
